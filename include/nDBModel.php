@@ -27,7 +27,7 @@ abstract class nDBModel {
      * 1. a numeric id if you just want to load one object
      * 2. a SQL string or an array of column => value pairs, if you want to load an array of results
      **/
-    public static function load($param) {
+    public static function load($param='') {
         $class = get_called_class();
         $table = static::get_table();
         if (is_numeric($param)) {
@@ -45,7 +45,7 @@ abstract class nDBModel {
         else {
             $db = nSQL::connect();
             if (is_string($param)) {
-                if ($param == '*') {
+                if ($param == '*' || empty($param)) {
                     $param = sprintf("SELECT * FROM %s", $table);
                 }
                 $result = $db->query($param);
@@ -77,29 +77,48 @@ abstract class nDBModel {
         return false;
     }
 
+    /**
+     * save to database
+     **/
     public function save() {
-        if (!$this->id) return false;
 
         $db = nSQL::connect();
 
         $vars = get_object_vars($this);
-        $updates = array();
-        foreach ($vars as $property => $value) {
-            if ($value) $updates[] = sprintf("%s = '%s'", $property, $db->real_escape_string($value));
+        $vars = array_filter($vars, function($a){return !empty($a)});
+
+        if (!$vars) return false;
+
+        if (!$this->id) {
+            $properties = array_keys($vars);
+
+            $sql = sprintf(
+                "INSERT INTO %s (%s) VALUES (%s)",
+                $this->get_table(),
+                implode(', ', $properties),
+                implode(', ', $vars)
+            );
+
+            if ($result = $db->query($sql)) {
+                $this->id = $db->insert_id;
+            }
         }
+        else {
+            $updates = array();
+            foreach ($vars as $property => $value) {
+                $updates[] = sprintf("%s = '%s'", $property, $db->real_escape_string($value));
+            }
 
-        if (!$updates) return false;
+            $sql = sprintf(
+                "UPDATE %s SET %s WHERE id = %d",
+                $this->get_table(),
+                implode(', ', $updates),
+                $this->id
+            );
 
-        $sql = sprintf(
-            "UPDATE %s SET %s WHERE id = %d",
-            $this->get_table(),
-            implode(', ', $updates),
-            $this->id
-        );
-
-        if ($result = $db->query($sql)) {
-            $this->id = $db->insert_id;
+            $result = $db->query($sql);
         }
+        
         return $result;
             
     }
