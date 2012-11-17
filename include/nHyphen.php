@@ -12,13 +12,14 @@ class nHyphen {
     public static function syllabize($words) {
         if (is_string($words)) $words = array($words);
 
-        $cmd = PYTHON_PATH . " " . HYPHENATOR . " " . implode(' ', array_map('escapeshellarg', $words));
+        $mapped = array_map('escapeshellarg', $words);
+        $cmd = PYTHON_PATH . " " . HYPHENATOR . " " . implode(' ', $mapped);
         exec($cmd, $out, $code);
 
         if ($code) {
             return $code;
         }
-        elseif (($json = json_decode($output)) === false) {
+        elseif (($json = json_decode($out[0])) === false) {
             return 'invalid json';
         }
 

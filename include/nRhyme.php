@@ -3,6 +3,7 @@
  * nRhyme class -- interfaces with RhymeBrain API
  **/
 require_once('nSQL.php');
+require_once(SITE_ROOT . '/model/nWord.php');
 
 class nRhyme {
 
@@ -14,6 +15,7 @@ class nRhyme {
     private static $custom_word_scores = array(); 
 
     # some words were just not meant to be rhymed. this is a list of them.
+    # NOTE: no point adding words that are shorter than the min word size
     private static $boring_words = array(
         'the',
     );
@@ -30,36 +32,57 @@ class nRhyme {
     public static function process_title($title, $names_per_word=5, $rhymes_per_word=10) {
         $parts = preg_split("/\W+/", $title, null, PREG_SPLIT_NO_EMPTY);
 
-        if (count($parts) > 1) {
+        if (!$parts) return false;
+        $more_than_1 = (count($parts) > 1);
+
+        if ($more_than_1) {
             # For now, if we have more than one distinct word, don't bother separating 
             # by syllable. TODO: consider changing this in the future?
-            $rhymes = array();
-            foreach ($parts as $word) {
-                if (!isset($rhymes[$word]) && strlen($word) >= static::$min_word_size && !in_array(strtolower($word), static::$boring_words)) {
-                    $rhymes[$word] = static::get_rhymes($word, $rhymes_per_word);
-                }
-            }
-
-            static::sort_by_score($rhymes, $names_per_word);
-
-            $new_names = array();
-            foreach ($rhymes as $word => $data) {
-                foreach ($data as $rhyme => $stuff) {
-                    $new_names[] = array(
-                        'title' => preg_replace("/\b\Q" . $word . "\E\b/", $rhyme, $title),
-                        'rhyme' => $rhyme
-                    );
-                }
-            }
-
-            return $new_names;
+            $words_to_rhyme = $parts;
         }
         else {
             # replacing the only word in a title wouldn't make much sense.
             # split the word into syllables and try to rhyme them.
-            $word = $parts[0];
-            # TODO: implement.
+            $single_word = new nWord(array('word' => $parts[0]));
+            $words_to_rhyme = $single_word->syllables;
         }
+
+        $rhymes = array();
+        foreach ($words_to_rhyme as $word) {
+            if (static::is_rhymable($word)) {
+                $rhymes[$word] = static::get_rhymes($word, $rhymes_per_word);
+            }
+        }
+
+        static::sort_by_score($rhymes, $names_per_word);
+
+        $new_names = array();
+        foreach ($rhymes as $word => $data) {
+            foreach ($data as $rhyme => $stuff) {
+                if ($more_than_1) 
+                    $new_title = preg_replace("/\b\Q" . $word . "\E\b/i", $rhyme, $title);
+                else 
+                    $new_title = preg_replace("/\Q" . $word . "\E/i", $rhyme, $title);
+
+                $new_names[] = array(
+                    'title' => $new_title,
+                    'rhyme' => $rhyme
+                );
+            }
+        }
+
+        return $new_names;
+    }
+
+    /**
+     * determines if the provided word is fit to be rhymed
+     **/
+    public static function is_rhymable($word) {
+        return (
+            !isset($rhymes[$word]) && 
+            strlen($word) >= static::$min_word_size && 
+            !in_array(strtolower($word), static::$boring_words)
+        );
     }
 
     /**

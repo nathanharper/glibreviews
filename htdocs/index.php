@@ -13,3 +13,6 @@ while (FALSE !== ($file = readdir($model_dir))) {
 }
 closedir($model_dir);
 
+require_once('nRhyme.php');
+$result = nRhyme::process_title('Insidious');
+var_dump($result);
