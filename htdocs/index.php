@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('America/New_York');
 define('SITE_ROOT', realpath(dirname(__FILE__) . "/.."));
 set_include_path(SITE_ROOT . "/include");
 require_once(SITE_ROOT . "/settings.php");
@@ -12,6 +13,3 @@ while (FALSE !== ($file = readdir($model_dir))) {
 }
 closedir($model_dir);
 
-$movies = nMovie::load('*');
-
-var_dump($movies);

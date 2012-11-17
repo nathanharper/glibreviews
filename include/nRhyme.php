@@ -35,7 +35,7 @@ class nRhyme {
             # by syllable. TODO: consider changing this in the future?
             $rhymes = array();
             foreach ($parts as $word) {
-                if (!isset($rhymes[$word]) && strlen($word) >= static::$min_word_size && !in_array($word, static::$boring_words)) {
+                if (!isset($rhymes[$word]) && strlen($word) >= static::$min_word_size && !in_array(strtolower($word), static::$boring_words)) {
                     $rhymes[$word] = static::get_rhymes($word, $rhymes_per_word);
                 }
             }

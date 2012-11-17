@@ -8,34 +8,46 @@ require_once('nRhyme.php');
 class nMovie extends nDBModel {
     public $name;
     public $rt_id;
+    public $score;
     public $release_date;
 
     /**
      * Generate alternate titles for the film using RhymeBrain.
      * @param int $name_count, the number of names to generate
      **/
-    public function generate_names($name_count = 5) {
+    public function generate_names($names_per_word=5, $rhymes_per_word=10) {
 
         if (!$this->name) return false;
 
-        $parts = preg_split("/\W+/", $this->name, null, PREG_SPLIT_NO_EMPTY);
+        $names = nRhyme::process_title($this->name, $names_per_word, $rhymes_per_word);
+        $db = nSQL::connect();
 
-        if (count($parts) > 1) {
-            # For now, if we have more than one distinct word, don't bother separating 
-            # by syllable. TODO: consider changing this in the future?
-            $rhymes = array();
-            foreach ($parts as $word) {
-                $rhymes[$word] = nRhyme::get_rhymes($word, 20);
-            }
+        if ($names)
+        foreach ($names as $data) {
+            $glib = new nGlibName(array(
+                'name' => $data['title'],
+                'movie_id' => $this->get_id()
+            ));
 
-            for ($i=0; $i < $name_count; $i++) {
+            if ($glib->save()) {
+                $word = nWord::load_one(array('word' => $data['rhyme']));
+                if (!$word) {
+                    $word = new nWord(array(
+                        'word' => $data['rhyme']
+                    ));
+                    $word->save();
+                }
+
+                if ($word_id = $word->get_id()) {
+                    $db->query(sprintf(
+                        "INSERT INTO glib_name_word (glib_name_id, word_id) VALUES (%d, %d)",
+                        $glib->get_id(),
+                        $word_id
+                    ));
+                }
             }
         }
-        else {
-            # replacing the only word in a title wouldn't make much sense.
-            # split the word into syllables and try to rhyme them.
-            $word = $parts[0];
-        }
+
     }
 
     public static function get_table() {

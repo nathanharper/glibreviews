@@ -77,6 +77,14 @@ abstract class nDBModel {
         return false;
     }
 
+    public static function load_one($param) {
+        $result = static::load($param);
+        if (is_array($result) && isset($result[0])) {
+            return $result[0];
+        }
+        return $result;
+    }
+
     /**
      * save to database
      **/
@@ -85,7 +93,7 @@ abstract class nDBModel {
         $db = nSQL::connect();
 
         $vars = get_object_vars($this);
-        $vars = array_filter($vars, function($a){return !empty($a)});
+        $vars = array_filter($vars, function($a){return !empty($a);});
 
         if (!$vars) return false;
 
@@ -96,7 +104,7 @@ abstract class nDBModel {
                 "INSERT INTO %s (%s) VALUES (%s)",
                 $this->get_table(),
                 implode(', ', $properties),
-                implode(', ', $vars)
+                "'" . implode("', '", $vars) . "'"
             );
 
             if ($result = $db->query($sql)) {
