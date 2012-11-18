@@ -8,11 +8,22 @@ require_once(SITE_ROOT . "/settings.php");
 $model_dir = opendir(SITE_ROOT . "/model");
 while (FALSE !== ($file = readdir($model_dir))) {
     if ('n' == substr($file, 0, 1) && '.php' == substr($file, -4)) {
-        include(SITE_ROOT . "/model/$file");
+        require_once(SITE_ROOT . "/model/$file");
     }
 }
 closedir($model_dir);
 
 require_once('nRhyme.php');
-$result = nRhyme::process_title('Insidious');
-var_dump($result);
+
+$title = !empty($_GET['title']) ? $_GET['title'] : "Lord of the Rings";
+$names_per_word = !empty($_GET['names']) ? intval($_GET['names']) : 10;
+$rhymes_per_word = !empty($_GET['rhymes']) ? intval($_GET['rhymes']) : 10;
+
+if ($title && ($result = nRhyme::process_title($_GET['title'], $names_per_word, $rhymes_per_word))) {
+    foreach ($result as $data) {
+        echo "{$data['title']}<br />";
+    }
+}
+else {
+    echo "<b>no results</b>";
+}

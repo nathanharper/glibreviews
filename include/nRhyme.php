@@ -10,6 +10,9 @@ class nRhyme {
     private static $base_url = "http://rhymebrain.com/talk";
     private static $min_word_size = 3;
 
+    private static $rhyme_full_words = true;
+    private static $rhyme_syllables = false; # whether or not to rhyme word syllables by default
+
     # array of custom word scores so we don't keep 
     # making unecessary queries.
     private static $custom_word_scores = array(); 
@@ -34,23 +37,51 @@ class nRhyme {
 
         if (!$parts) return false;
         $more_than_1 = (count($parts) > 1);
+        $one_word = (count($parts) < 2);
 
-        if ($more_than_1) {
-            # For now, if we have more than one distinct word, don't bother separating 
-            # by syllable. TODO: consider changing this in the future?
-            $words_to_rhyme = $parts;
-        }
-        else {
+        if ($one_word) {
             # replacing the only word in a title wouldn't make much sense.
             # split the word into syllables and try to rhyme them.
-            $single_word = new nWord(array('word' => $parts[0]));
-            $words_to_rhyme = $single_word->syllables;
+            static::$rhyme_syllables = TRUE;
+            static::$rhyme_full_words = FALSE;
         }
 
         $rhymes = array();
-        foreach ($words_to_rhyme as $word) {
-            if (static::is_rhymable($word)) {
-                $rhymes[$word] = static::get_rhymes($word, $rhymes_per_word);
+        foreach ($parts as $word) {
+            if (!isset($rhymes[$word]) && (static::is_rhymable($word) || $one_word)) {
+                if (static::$rhyme_full_words) {
+                    $word_rhymes = static::get_rhymes($word, $rhymes_per_word);
+                    static::generate_titles($word_rhymes, $word, $title);
+                    $rhymes[$word] = $word_rhymes;
+                }
+                if (static::$rhyme_syllables) {
+                    $word_object = new nWord(array('word' => $word));
+                    $word_rhymes = static::get_rhymes($word, $rhymes_per_word);
+
+                    $syllable_count = count($word_object->syllables);
+                    if ($syllable_count < 2) {
+                        # word is one syllable
+                        if (!static::$rhyme_full_words && $one_word) {
+                            static::generate_titles($word_rhymes, $word, $title);
+                            $rhymes[$word] = $word_rhymes;
+                        }
+                        continue; # if the full word has already been rhymed, we can continue
+                    }
+
+                    list($replace) = array_slice($word_object->syllables, -1);
+
+                    # start at the end of the word and work backwards
+                    # Still rhyme the full word, but replace only the last syllable --
+                    # otherwise, RhymeBrain will often get the pronunciation wrong.
+                    for ($i=1; $i < $syllable_count; $i++) {
+                        if (!isset($rhymes[$replace])) {
+                            static::generate_titles($word_rhymes, $replace, $title, TRUE);
+                            $rhymes[$replace] = $word_rhymes;
+                        }
+                        list($next_part) = array_slice($word_object->syllables, 0 - ($i + 1), 1);
+                        $replace = $next_part . $replace;
+                    }
+                }
             }
         }
 
@@ -59,13 +90,8 @@ class nRhyme {
         $new_names = array();
         foreach ($rhymes as $word => $data) {
             foreach ($data as $rhyme => $stuff) {
-                if ($more_than_1) 
-                    $new_title = preg_replace("/\b\Q" . $word . "\E\b/i", $rhyme, $title);
-                else 
-                    $new_title = preg_replace("/\Q" . $word . "\E/i", $rhyme, $title);
-
                 $new_names[] = array(
-                    'title' => $new_title,
+                    'title' => $stuff['glib_title'],
                     'rhyme' => $rhyme
                 );
             }
@@ -75,12 +101,45 @@ class nRhyme {
     }
 
     /**
+     * generate titles for an array of words.
+     *
+     * @param array $replacements, array of rhyme words. This is directly modified.
+     * @param string $word, the word to replace
+     * @param string $title, the full original title
+     * @param bool $syllables, whether or not to do replacements at syllable level
+     **/
+    public static function generate_titles(&$replacements, $word, $title, $syllables = FALSE) {
+        if ($syllables) {
+            $regex = "/\B%s\b/i";
+        }
+        else {
+            $regex = "/\b%s\b/i";
+        }
+
+        foreach ($replacements as $rhyme_word => $rhyme_data) {
+            if ($syllables && preg_match("/^[aeiouy]/i", $rhyme_word)) {
+                # if the first letter of the rhyme is a vowel,
+                # remove any vowels from the end of the word prior to the match
+                $final_regex = '/[aeiouy]*\B\Q' . $word . '\E\b/i';
+            }
+            else {
+                $final_regex = sprintf($regex, '\Q' . $word . '\E');
+            }
+
+            $replacements[$rhyme_word]['glib_title'] = preg_replace(
+                $final_regex,
+                $rhyme_word,
+                $title
+            );
+        }
+    }
+
+    /**
      * determines if the provided word is fit to be rhymed
      **/
     public static function is_rhymable($word) {
         return (
-            !isset($rhymes[$word]) && 
-            strlen($word) >= static::$min_word_size && 
+            strlen($word) >= static::$min_word_size &&
             !in_array(strtolower($word), static::$boring_words)
         );
     }

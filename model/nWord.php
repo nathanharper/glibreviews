@@ -28,4 +28,5 @@ class nWord extends nDBModel {
         }
         return NULL;
     }
+
 }

@@ -24,6 +24,11 @@ class nMovie extends nDBModel {
 
         if ($names)
         foreach ($names as $data) {
+            if (nGlibName::load_one(array('name' => $data['title'], 'movie_id' => $this->get_id()))) {
+                # glib title already exists
+                continue;
+            }
+
             $glib = new nGlibName(array(
                 'name' => $data['title'],
                 'movie_id' => $this->get_id()
