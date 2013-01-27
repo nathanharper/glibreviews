@@ -17,11 +17,21 @@ class nRhyme {
     # making unecessary queries.
     private static $custom_word_scores = array(); 
 
+    public static $nw = null; # Numbers_Words object
+
     # some words were just not meant to be rhymed. this is a list of them.
     # NOTE: no point adding words that are shorter than the min word size
     private static $boring_words = array(
         'the',
     );
+
+    # convert a number to a word
+    public static function num_to_word($num) {
+        if (! is_null(static::$nw)) {
+            return static::$nw->toWords(intval($num));
+        }
+        return $num;
+    }
 
     /**
      * Split a movie title, retrieve rhymes, process results
@@ -33,6 +43,15 @@ class nRhyme {
      * @return a $name_count length array of glib titles
      **/
     public static function process_title($title, $names_per_word=5, $rhymes_per_word=10) {
+        # Turn numerals into words so we can rhyme them
+        try {
+            require_once('Numbers/Words.php');
+            static::$nw = new Numbers_Words();
+            $title = preg_replace("/\d+/e", 'static::num_to_word($0);', $title);
+        } catch (Exception $e) {
+            error_log("Could not translate numbers to words. make sure PEAR package Numbers_Words is properly installed.");
+        }
+
         $parts = preg_split("/\W+/", $title, null, PREG_SPLIT_NO_EMPTY);
 
         if (!$parts) return false;
