@@ -3,6 +3,7 @@
  * nRhyme class -- interfaces with RhymeBrain API
  **/
 require_once('nSQL.php');
+require_once('Numbers/Words.php');
 require_once(SITE_ROOT . '/model/nWord.php');
 
 class nRhyme {
@@ -25,14 +26,6 @@ class nRhyme {
         'the',
     );
 
-    # convert a number to a word
-    public static function num_to_word($num) {
-        if (! is_null(static::$nw)) {
-            return static::$nw->toWords(intval($num));
-        }
-        return $num;
-    }
-
     /**
      * Split a movie title, retrieve rhymes, process results
      *
@@ -44,13 +37,8 @@ class nRhyme {
      **/
     public static function process_title($title, $names_per_word=5, $rhymes_per_word=10) {
         # Turn numerals into words so we can rhyme them
-        try {
-            require_once('Numbers/Words.php');
-            static::$nw = new Numbers_Words();
-            $title = preg_replace("/\d+/e", 'static::num_to_word($0);', $title);
-        } catch (Exception $e) {
-            error_log("Could not translate numbers to words. make sure PEAR package Numbers_Words is properly installed.");
-        }
+        if (is_null(static::$nw)) static::$nw = new Numbers_Words();
+        $title = preg_replace("/\d+/e", 'static::$nw->toWords($0);', $title);
 
         $parts = preg_split("/\W+/", $title, null, PREG_SPLIT_NO_EMPTY);
 
@@ -129,10 +117,10 @@ class nRhyme {
      **/
     public static function generate_titles(&$replacements, $word, $title, $syllables = FALSE) {
         if ($syllables) {
-            $regex = "/\B%s\b/i";
+            $regex = '/\B%s\b/i';
         }
         else {
-            $regex = "/\b%s\b/i";
+            $regex = '/\b%s\b/i';
         }
 
         foreach ($replacements as $rhyme_word => $rhyme_data) {
@@ -197,7 +185,7 @@ class nRhyme {
                     # query to see if we have a score for this word
                     $sql = sprintf(
                         "SELECT score FROM word WHERE word = '%s' LIMIT 1",
-                        $j->word
+                        nSQL::escape($j->word)
                     );
 
                     $glib_score = 0;
